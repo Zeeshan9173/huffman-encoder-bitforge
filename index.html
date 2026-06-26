@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BitForge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .node circle { fill: #10b981; stroke: #047857; stroke-width: 2px; }
+        .node text { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; fill: #e2e8f0; }
+        .link { fill: none; stroke: #475569; stroke-width: 1.5px; }
+        /* Custom scrollbar for the canvas */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-slate-950">
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <header class="border-b border-slate-800 pb-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">BitForge</h1>
+                <p class="text-slate-400 text-sm mt-1">High-performance Client-Side Huffman Binary Compressor</p>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-emerald-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> WASM/JS Sandbox Mode
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <div class="lg:col-span-4 space-y-6">
+                <div class="bg-slate-900 p-1 rounded-xl border border-slate-800 flex">
+                    <button id="tab-compress" class="flex-1 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white shadow-sm transition-all cursor-pointer">Compress</button>
+                    <button id="tab-decompress" class="flex-1 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all cursor-pointer">Decompress</button>
+                </div>
+
+                <div id="dropzone" class="border-2 border-dashed border-slate-800 hover:border-emerald-500/50 rounded-2xl p-8 text-center bg-slate-900/40 transition-all cursor-pointer group">
+                    <input type="file" id="file-input" class="hidden">
+                    <div class="space-y-4">
+                        <div class="p-4 bg-slate-900 rounded-full w-16 h-16 flex items-center justify-center mx-auto group-hover:scale-105 transition-transform border border-slate-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-slate-200" id="dropzone-text">Drag & drop your file here, or <span class="text-emerald-400 font-semibold">browse</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="file-meta" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 font-mono text-xs">
+                    <div class="flex justify-between"><span class="text-slate-500">File:</span> <span id="meta-name" class="text-slate-200 font-sans font-medium truncate max-w-[180px]">file.txt</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">Size:</span> <span id="meta-size" class="text-slate-200">0 bytes</span></div>
+                </div>
+
+                <button id="btn-run" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 px-4 rounded-xl transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Execute Compression
+                </button>
+
+                <div id="metrics-card" class="hidden bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4 relative overflow-hidden">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Metrics</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-3">
+                            <p class="text-xs text-slate-500 font-mono">Output</p>
+                            <p class="text-lg font-bold font-mono text-slate-200 mt-0.5" id="metric-out">0 B</p>
+                        </div>
+                        <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-3">
+                            <p class="text-xs text-slate-500 font-mono">Ratio</p>
+                            <p class="text-lg font-bold font-mono text-emerald-400 mt-0.5" id="metric-ratio">0%</p>
+                        </div>
+                        <div class="col-span-2 bg-slate-900/60 border border-slate-800/60 rounded-xl p-3">
+                            <p class="text-xs text-slate-500 font-mono">Time</p>
+                            <p class="text-lg font-bold font-mono text-cyan-400 mt-0.5" id="metric-time">0 ms</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-8 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden h-[700px]">
+                <div class="border-b border-slate-800 px-6 py-4 flex justify-between items-center bg-slate-900/50">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-200">Huffman Tree AST</h3>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="btn-zoom-in" class="text-xs text-slate-300 hover:bg-slate-700 bg-slate-800 border border-slate-700 px-3 py-1 rounded cursor-pointer transition-colors">+</button>
+                        <button id="btn-zoom-out" class="text-xs text-slate-300 hover:bg-slate-700 bg-slate-800 border border-slate-700 px-3 py-1 rounded cursor-pointer transition-colors">-</button>
+                        <button id="btn-clear" class="text-xs text-slate-400 hover:text-slate-200 border border-slate-700 px-3 py-1 rounded transition-colors cursor-pointer">Clear</button>
+                    </div>
+                </div>
+                <div class="flex-1 relative bg-slate-950/40 overflow-auto" id="tree-container">
+                    <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 text-sm">
+                        Waiting for execution...
+                    </div>
+                    <svg id="tree-svg"></svg>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
